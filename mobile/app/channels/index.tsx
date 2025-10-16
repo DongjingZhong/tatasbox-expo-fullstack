@@ -35,7 +35,7 @@ const DATA: Item[] = [
     desc: "找模型、理思路，做更稳的决定。",
     icon: "analytics-outline", // safe & widely available icon
     tint: "#8B5CF6",
-    href: "/channels/decision-practice" as Href, // ← new route
+    href: "/channels/decision" as Href, // ← new route
     group: "self-improve",
   },
 
