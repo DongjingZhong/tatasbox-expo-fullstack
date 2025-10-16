@@ -1,4 +1,4 @@
-// components/ui/menu-button.tsx
+// All comments in English only.
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions } from "@react-navigation/native";
 import { useNavigation } from "expo-router";
@@ -14,13 +14,10 @@ import { useTheme } from "../../providers/ThemeProvider";
 
 type Props = {
   onPress?: () => void;
-  /** 覆盖图标颜色（优先级最高）；也兼容 tintColor/iconColor */
   color?: string;
-  tintColor?: string; // 兼容别名
-  iconColor?: string; // 兼容别名
-  /** 图标大小（dp），默认 22 */
+  tintColor?: string;
+  iconColor?: string;
   size?: number;
-  /** 容器样式 */
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 };
@@ -37,12 +34,15 @@ export default function MenuButton({
   const navigation = useNavigation();
   const { isDark } = useTheme();
 
-  // 最终颜色：prop > alias > 主题默认
   const finalColor =
     color ?? tintColor ?? iconColor ?? (isDark ? "#FFFFFF" : "#111827");
 
   const handlePress = () => {
-    if (onPress) return onPress();
+    // Execute callback rather than returning it (prevents weird loops)
+    if (onPress) {
+      onPress();
+      return;
+    }
     navigation.dispatch(DrawerActions.openDrawer());
   };
 
@@ -65,9 +65,7 @@ export default function MenuButton({
 }
 
 const styles = StyleSheet.create({
-  btn: {
-    paddingHorizontal: 12,
-  },
+  btn: { paddingHorizontal: 12 },
   iconBox: {
     width: 28,
     height: 28,

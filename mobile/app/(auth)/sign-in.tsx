@@ -9,11 +9,8 @@ import {
   Easing,
   StyleSheet as RNStyleSheet,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useRef } from "react";
-import { useGoogleAuth } from "@/src/lib/auth/google";
-import { useAuthProfile } from "@/src/store/useAuthProfile";
-import { isProfileComplete } from "@/src/types/profile";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import LottieView from "lottie-react-native";
@@ -22,15 +19,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const { height, width } = Dimensions.get("window");
 
 export default function SignInScreen() {
-  const router = useRouter();
-  const { promptAsync } = useGoogleAuth();
-  const profile = useAuthProfile((s) => s.profile);
   const insets = useSafeAreaInsets();
 
   // Breathing glow animation
   const glowAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
@@ -45,25 +39,14 @@ export default function SignInScreen() {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, [glowAnim]);
 
-  useEffect(() => {
-    if (!profile) return;
-    const next = isProfileComplete(profile)
-      ? ("/channels" as const)
-      : ("/profile" as const);
-    router.replace(next);
-  }, [profile, router]);
+  const handleTermsPress = () => console.log("Navigate to Terms of Service");
+  const handlePrivacyPress = () => console.log("Navigate to Privacy Policy");
 
-  const handleTermsPress = () => {
-    console.log("Navigate to Terms of Service");
-  };
-  const handlePrivacyPress = () => {
-    console.log("Navigate to Privacy Policy");
-  };
-
-  // Derived animation values
   const glowScale = glowAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.15],
@@ -85,10 +68,9 @@ export default function SignInScreen() {
           end={{ x: 1, y: 1 }}
         >
           {/* Lottie fills the entire gradient as the background */}
-          {/* Lottie fills the entire gradient as the background */}
           <View pointerEvents="none" style={styles.lottieWrap}>
             <LottieView
-              source={require("../../assets/animations/awaiting.json")}
+              source={require("@/assets/animations/awaiting.json")}
               autoPlay
               loop
               style={styles.lottieFill}
@@ -99,7 +81,7 @@ export default function SignInScreen() {
           {/* Back button */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="返回"
+            accessibilityLabel="Back"
             onPress={() => router.back()}
             style={[styles.backBtn, { top: insets.top + 16 }]}
           >
@@ -111,22 +93,14 @@ export default function SignInScreen() {
             pointerEvents="none"
             style={[
               styles.topGlow,
-              {
-                opacity: glowOpacity,
-                transform: [{ scale: glowScale }],
-              },
+              { opacity: glowOpacity, transform: [{ scale: glowScale }] },
             ]}
           />
 
-          {/* Headline + description (plain text) */}
+          {/* Headline + subtitle */}
           <View style={styles.titleSection}>
             <Text style={styles.title}>欢迎来到Tatasbox</Text>
             <Text style={styles.subtitle}>您的私人成长空间</Text>
-
-            {/* Plain description text, not a button */}
-            <Text style={styles.description}>
-              立即注册，开启您的个性化成长旅程
-            </Text>
           </View>
         </LinearGradient>
       </View>
@@ -139,7 +113,10 @@ export default function SignInScreen() {
               styles.button,
               pressed && styles.buttonPressed,
             ]}
-            onPress={() => promptAsync()}
+            onPress={() => {
+              // After Google auth success, go to profile setup
+              router.replace("/profile");
+            }}
           >
             <LinearGradient
               colors={["#FFFFFF", "#F8FAFC"]}
@@ -173,7 +150,7 @@ export default function SignInScreen() {
         </View>
       </View>
 
-      {/* Bottom decorations (minimal) */}
+      {/* Bottom decorations */}
       <View style={styles.bottomDecoration}>
         <View style={styles.waveDecoration} />
         <View style={styles.floatingOrbs}>
@@ -190,30 +167,17 @@ export default function SignInScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-
-  // Taller hero to fit content comfortably
-  backgroundSection: {
-    height: height * 0.66,
-    position: "relative",
-  },
+  backgroundSection: { height: height * 0.66, position: "relative" },
   backgroundGradient: {
     flex: 1,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
     overflow: "hidden",
     justifyContent: "flex-end",
-    paddingBottom: 28, // a bit more bottom padding since desc is plain text now
+    paddingBottom: 28,
   },
-
-  // Lottie absolute fill background
-  lottieFill: {
-    ...RNStyleSheet.absoluteFillObject,
-    opacity: 0.24, // keep text readable
-  },
-  lottieWrap: {
-    ...StyleSheet.absoluteFillObject, // absolute fill wrapper
-  },
-
+  lottieFill: { ...RNStyleSheet.absoluteFillObject, opacity: 0.24 },
+  lottieWrap: { ...StyleSheet.absoluteFillObject },
   backBtn: {
     position: "absolute",
     left: 20,
@@ -230,8 +194,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-
-  // Content stack in hero
   titleSection: {
     alignItems: "center",
     paddingHorizontal: 32,
@@ -240,7 +202,6 @@ const styles = StyleSheet.create({
     zIndex: 2,
     gap: 8,
   },
-
   title: {
     fontSize: 32,
     fontWeight: "800",
@@ -261,22 +222,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-
-  // Plain description (not a pill/button)
-  description: {
-    fontSize: 15,
-    color: "rgba(255, 255, 255, 0.96)",
-    textAlign: "center",
-    lineHeight: 22,
-    fontWeight: "500",
-    maxWidth: 320,
-    marginTop: 8,
-    textShadowColor: "rgba(0, 0, 0, 0.08)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-
-  // Single, breathing halo (top only)
   topGlow: {
     position: "absolute",
     top: -100,
@@ -286,17 +231,8 @@ const styles = StyleSheet.create({
     borderRadius: 120,
     backgroundColor: "#FFFFFF",
   },
-
-  mainContent: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  actionSection: {
-    alignItems: "center",
-    marginTop: -6, // subtle overlap towards hero
-  },
-
+  mainContent: { flex: 1, justifyContent: "center", paddingHorizontal: 32 },
+  actionSection: { alignItems: "center", marginTop: -6 },
   button: {
     width: "100%",
     borderRadius: 16,
@@ -316,7 +252,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
   },
-
   buttonContent: {
     flexDirection: "row",
     alignItems: "center",
@@ -344,10 +279,9 @@ const styles = StyleSheet.create({
     height: 24,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(102, 126, 234, 0.1)",
+    backgroundColor: "rgba(102,126,234,0.1)",
     borderRadius: 12,
   },
-
   helperContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -370,7 +304,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     textDecorationLine: "underline",
   },
-
   bottomDecoration: { position: "absolute", bottom: 0, left: 0, right: 0 },
   waveDecoration: {
     height: 24,

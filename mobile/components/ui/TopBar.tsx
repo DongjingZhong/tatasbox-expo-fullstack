@@ -35,11 +35,6 @@ export default function TopBar({
 
   const Left = () =>
     left === "menu" ? (
-      /**
-       * 若你的 MenuButton 支持颜色属性（color/tintColor/iconColor），这行就能生效。
-       * 如果不支持，可在 MenuButton 内部读取 useTheme 或增加 color/tintColor prop。
-       * 这里用 as any 规避 TS 对未知 prop 的报错，不会影响运行。
-       */
       <MenuButton
         {...({ color: iconColor, tintColor: iconColor, iconColor } as any)}
       />
@@ -59,7 +54,7 @@ export default function TopBar({
         <AppText
           variant="headline"
           weight="800"
-          style={styles.headerTitle} // 不再硬编码颜色，走 AppText(theme)
+          style={styles.headerTitle}
           numberOfLines={1}
         >
           {title}
@@ -72,7 +67,7 @@ export default function TopBar({
         <AppText
           variant="title"
           weight="900"
-          style={[styles.brandPart, { color: brandMainColor }]} // TATAS 跟随主题
+          style={[styles.brandPart, { color: brandMainColor }]}
         >
           TATAS
         </AppText>
@@ -95,7 +90,7 @@ export default function TopBar({
   );
 
   return (
-    <SafeAreaView edges={["top"]} style={{ backgroundColor: "transparent" }}>
+    <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <View style={styles.header}>
         <Left />
         {Middle}
@@ -106,12 +101,21 @@ export default function TopBar({
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: "transparent",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+  },
   header: {
     height: 52,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 12,
+    backgroundColor: "transparent", // Explicitly set to transparent
   },
   brand: {
     letterSpacing: 1,
@@ -120,15 +124,14 @@ const styles = StyleSheet.create({
   brandPart: {
     letterSpacing: 1,
     textTransform: "uppercase",
-    // 颜色交给渲染时动态注入（跟随主题）
   },
   brandAccent: {
-    color: THEME_GREEN, // BOX 维持品牌绿色
+    color: THEME_GREEN,
     letterSpacing: 1,
     textTransform: "uppercase",
   },
   headerTitle: {
-    letterSpacing: 0.2, // 颜色走 AppText(theme)，不再硬编码
+    letterSpacing: 0.2,
   },
   iconBtn: {
     width: 36,
@@ -136,5 +139,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "transparent", // Ensure button background is transparent
   },
 });
