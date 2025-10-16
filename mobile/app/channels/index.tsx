@@ -7,7 +7,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppText from "../../components/ui/AppText"; // ← adjust path if needed
 import { useTheme } from "../../providers/ThemeProvider"; // ← adjust path if needed
-import TopBar from "@/components/ui/TopBar";
 
 type Item = {
   key: string;
@@ -92,7 +91,6 @@ export default function ChannelsHome() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <TopBar left="back" />
       <View style={[styles.container]}>
         {(["self-improve", "self-heal", "fun"] as const).map((g) => (
           <View key={g} style={styles.section}>
