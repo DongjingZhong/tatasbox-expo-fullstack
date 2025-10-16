@@ -1,6 +1,6 @@
-// app/(tabs)/index.tsx
+// All code comments in English only.
 import { Ionicons } from "@expo/vector-icons";
-import { router, type Href } from "expo-router";
+import { router } from "expo-router";
 import * as Speech from "expo-speech";
 import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -9,12 +9,16 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import StartNowBar from "../../../components/home/StartNowBar";
-import ChatBubble from "../../../components/ui/ChatBubble";
-import TalkingAvatar from "../../../components/ui/TalkingAvatar";
-import ThemeToggle from "../../../components/ui/ThemeToggle"; // ← NEW
-import TopBar from "../../../components/ui/TopBar";
-import { useTheme } from "../../../providers/ThemeProvider"; // ← NEW
+import StartNowBar from "@/components/home/StartNowBar";
+import ChatBubble from "@/components/ui/ChatBubble";
+import TalkingAvatar from "@/components/ui/TalkingAvatar";
+import ThemeToggle from "@/components/ui/ThemeToggle";
+import TopBar from "@/components/ui/TopBar";
+import { useTheme } from "@/providers/ThemeProvider";
+
+// Auth/profile store + validator
+import { useAuthProfile } from "@/src/store/useAuthProfile";
+import { isProfileComplete } from "@/src/types/profile";
 
 const WELCOME =
   "Hi，欢迎来到 Tatasbox。这里是可以让你安全地练习决策、语言交流、自我探索的私人空间。请点击下方的按钮开始体验。";
@@ -23,14 +27,22 @@ type AvatarMode = "speaking" | "waving" | "awaiting";
 
 export default function Home() {
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme(); // ← use global theme
+  const { colors, isDark } = useTheme();
 
-  // voice + avatar state
+  // Store bindings
+  const hydrate = useAuthProfile((s) => s.hydrate);
+  const hydrated = useAuthProfile((s) => s.hydrated); // ← NEW
+
+  // Hydrate from AsyncStorage on mount
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  // Voice + avatar
   const [speaking, setSpeaking] = useState(false);
   const [isVoiceOn, setIsVoiceOn] = useState(false);
   const [avatarMode, setAvatarMode] = useState<AvatarMode>("waving");
 
-  // speak welcome
   const startSpeaking = useCallback(() => {
     Speech.stop();
     Speech.speak(WELCOME, {
@@ -64,7 +76,6 @@ export default function Home() {
     };
   }, []);
 
-  // toggle TTS
   const toggleVoice = () => {
     if (!isVoiceOn) {
       setIsVoiceOn(true);
@@ -76,6 +87,31 @@ export default function Home() {
       setAvatarMode("waving");
     }
   };
+
+  // Robust PLAY handler: ensure hydration, then branch
+  const onPlay = useCallback(async () => {
+    // Ensure hydration completed; if not, run it once more and wait
+    if (!hydrated) {
+      await hydrate();
+    }
+
+    // Re-read the freshest state directly from the store to avoid stale closures
+    const { profile: pNow, signedIn: sNow } = useAuthProfile.getState();
+
+    if (!sNow || !pNow) {
+      router.push("/(auth)/sign-in");
+      return;
+    }
+
+    if (!isProfileComplete(pNow)) {
+      // Profile exists but incomplete → take user to complete it
+      router.push("/profile"); // or "/(onboarding)/complete-profile"
+      return;
+    }
+
+    // All good → go to channels
+    router.push("/channels");
+  }, [hydrated, hydrate]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -120,19 +156,13 @@ export default function Home() {
         />
       </ScrollView>
 
-      {/* ▶ Play → 选择频道 */}
-      <StartNowBar
-        onPress={() => router.push("/channels" as Href)}
-        bottomFraction={1 / 5}
-      />
+      {/* ▶ PLAY — guarded by hydration inside the handler */}
+      <StartNowBar onPress={onPlay} bottomFraction={1 / 5} />
 
-      {/* ↓ Place ThemeToggle BELOW the Play button (closer to bottom) */}
+      {/* Floating ThemeToggle */}
       <View
         pointerEvents="box-none"
-        style={[
-          styles.themeToggleFloating,
-          { bottom: 10 + insets.bottom }, // below StartNowBar (which sits ~60+px from bottom)
-        ]}
+        style={[styles.themeToggleFloating, { bottom: 10 + insets.bottom }]}
       >
         <ThemeToggle />
       </View>
@@ -206,8 +236,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-
-  // NEW: floating ThemeToggle (z-index lower than StartNowBar's 100)
   themeToggleFloating: {
     position: "absolute",
     left: 0,
