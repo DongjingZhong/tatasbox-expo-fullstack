@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions } from "@react-navigation/native";
 import { useNavigation, useRouter } from "expo-router";
 import React from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useAuthProfile } from "@/src/store/useAuthProfile";
@@ -12,12 +12,19 @@ import MenuButton from "./menu-button";
 
 const THEME_GREEN = "#7FA392";
 
+type BottomSeparatorMode = "none" | "line" | "button";
+
 type Props = {
   left?: "menu" | "back";
   onLeftPress?: () => void;
   onNoticePress?: () => void;
   title?: React.ReactNode;
   showNotice?: boolean;
+
+  /** bottom separator */
+  bottomSeparator?: BottomSeparatorMode; // "none" | "line" | "button"
+  bottomLabel?: string; // label for the button mode
+  onBottomPress?: () => void; // handler for the button mode
 };
 
 export default function TopBar({
@@ -26,6 +33,9 @@ export default function TopBar({
   onNoticePress,
   title,
   showNotice = true,
+  bottomSeparator = "none",
+  bottomLabel = "操作",
+  onBottomPress,
 }: Props) {
   const router = useRouter();
   const navigation = useNavigation();
@@ -36,6 +46,10 @@ export default function TopBar({
 
   const iconColor = isDark ? "#FFFFFF" : "#111827";
   const brandMainColor = colors.text;
+  const dividerColor = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
+  const buttonBorder = isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)";
+  const buttonText = isDark ? "#F3F4F6" : "#111827";
+  const buttonBg = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)";
 
   const Left = () => {
     if (left === "menu") {
@@ -106,7 +120,7 @@ export default function TopBar({
           </Pressable>
         )}
 
-        {avatar && (
+        {avatar ? (
           <Pressable
             onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
             accessibilityRole="button"
@@ -138,9 +152,9 @@ export default function TopBar({
               />
             </View>
           </Pressable>
+        ) : (
+          <View style={styles.avatarSpacer} />
         )}
-
-        {!avatar && <View style={styles.avatarSpacer} />}
       </View>
     );
   };
@@ -151,19 +165,45 @@ export default function TopBar({
       style={[
         styles.safeArea,
         {
-          // Give it a real background so it visually “exists” in layout
-          backgroundColor: colors.background,
-          borderBottomColor: isDark
-            ? "rgba(255,255,255,0.08)"
-            : "rgba(0,0,0,0.06)",
+          backgroundColor: "transparent", // always transparent
         },
       ]}
     >
+      {/* Transparent status bar (Android needs this) */}
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
       <View style={styles.header}>
         <Left />
         {Middle}
         <Right />
       </View>
+
+      {/* Bottom separator (line or button) */}
+      {bottomSeparator === "line" && (
+        <View style={[styles.bottomLine, { backgroundColor: dividerColor }]} />
+      )}
+
+      {bottomSeparator === "button" && (
+        <Pressable
+          onPress={onBottomPress}
+          accessibilityRole="button"
+          style={[
+            styles.bottomBtn,
+            {
+              borderColor: buttonBorder,
+              backgroundColor: buttonBg,
+            },
+          ]}
+        >
+          <Ionicons name="ellipsis-horizontal" size={16} color={buttonText} />
+          <AppText variant="caption" weight="700" style={{ color: buttonText }}>
+            {bottomLabel}
+          </AppText>
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
@@ -172,9 +212,8 @@ const AVATAR_SIZE = 36;
 const AVATAR_GLOW_SIZE = AVATAR_SIZE + 8;
 
 const styles = StyleSheet.create({
-  // ⬇️ NOT absolute anymore — it now takes up space in layout
   safeArea: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 0,
   },
   header: {
     height: 56,
@@ -184,22 +223,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: "transparent",
   },
-  brand: {
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  brandPart: {
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
+  brand: { letterSpacing: 1, textTransform: "uppercase" },
+  brandPart: { letterSpacing: 1, textTransform: "uppercase" },
   brandAccent: {
     color: THEME_GREEN,
     letterSpacing: 1,
     textTransform: "uppercase",
   },
-  headerTitle: {
-    letterSpacing: 0.2,
-  },
+  headerTitle: { letterSpacing: 0.2 },
+
   iconBtn: {
     width: 40,
     height: 40,
@@ -208,14 +240,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "transparent",
   },
-  rightContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  avatarContainer: {
-    position: "relative",
-  },
+  rightContainer: { flexDirection: "row", alignItems: "center", gap: 8 },
+
+  avatarContainer: { position: "relative" },
   avatarGlow: {
     width: AVATAR_GLOW_SIZE,
     height: AVATAR_GLOW_SIZE,
@@ -233,7 +260,23 @@ const styles = StyleSheet.create({
     borderRadius: AVATAR_SIZE / 2,
     borderWidth: 1.5,
   },
-  avatarSpacer: {
-    width: 8,
+  avatarSpacer: { width: 8 },
+
+  /* bottom separator */
+  bottomLine: {
+    height: StyleSheet.hairlineWidth,
+    width: "100%",
+  },
+  bottomBtn: {
+    alignSelf: "center",
+    marginTop: 6,
+    marginBottom: 2,
+    paddingHorizontal: 12,
+    height: 28,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 });

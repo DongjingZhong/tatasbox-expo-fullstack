@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Link, type Href } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { LinearGradient } from "expo-linear-gradient";
 
 import TopBar from "@/components/ui/TopBar";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -25,16 +26,21 @@ export default function DecisionHome() {
   const pageBg = isDark ? "#0F172A" : "#F8FAFC";
   const titleColor = isDark ? "#F1F5F9" : "#0F172A";
 
-  // Enhanced color palette with better contrast
-  const primary = isDark ? "#3B82F6" : "#2563EB";
-  const primaryEdge = isDark ? "#1E40AF" : "#1E3A8A";
-  const accent = isDark ? "#10B981" : "#059669";
-  const accentEdge = isDark ? "#047857" : "#065F46";
-
-  // Typed routes as constants
+  // routes
   const TO_MY: Href = "/channels/decision/my" as Href;
   const TO_SIM: Href = "/channels/decision/sim" as Href;
   const TO_HISTORY: Href = "/channels/decision/my?view=history" as Href;
+
+  // --- Lightened gradients that STILL match card icon hues ---
+  type GradientTuple = readonly [string, string];
+
+  // Orange (custom decision): lighter -> base
+  const ORANGE_GRAD: GradientTuple = ["#FCD34D", "#F59E0B"]; // amber-300 -> amber-500
+  const ORANGE_GLOW = "rgba(245,158,11,0.28)";
+
+  // Green (simulation): lighter -> base
+  const GREEN_GRAD: GradientTuple = ["#A7F3D0", "#34D399"]; // emerald-200 -> emerald-400
+  const GREEN_GLOW = "rgba(16,185,129,0.26)";
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: pageBg }]}>
@@ -114,9 +120,7 @@ export default function DecisionHome() {
                 <View
                   style={[
                     styles.cardIcon,
-                    {
-                      backgroundColor: isDark ? "#F59E0B20" : "#FEF3C7",
-                    },
+                    { backgroundColor: isDark ? "#F59E0B20" : "#FEF3C7" },
                   ]}
                 >
                   <Ionicons
@@ -140,13 +144,14 @@ export default function DecisionHome() {
                 </View>
               </View>
 
-              <Play3DButton
-                href={TO_MY}
-                label="开始练习 "
-                topColor={primary}
-                edgeColor={primaryEdge}
-                lightText
-              />
+              <View style={styles.cardButtonContainer}>
+                <GlowPillButton
+                  href={TO_MY}
+                  label="马上开始 "
+                  gradientColors={ORANGE_GRAD}
+                  glowColor={ORANGE_GLOW}
+                />
+              </View>
             </View>
 
             {/* Simulation Card */}
@@ -164,9 +169,7 @@ export default function DecisionHome() {
                 <View
                   style={[
                     styles.cardIcon,
-                    {
-                      backgroundColor: isDark ? "#10B98120" : "#D1FAE5",
-                    },
+                    { backgroundColor: isDark ? "#10B98120" : "#D1FAE5" },
                   ]}
                 >
                   <MaterialCommunityIcons
@@ -190,13 +193,14 @@ export default function DecisionHome() {
                 </View>
               </View>
 
-              <Play3DButton
-                href={TO_SIM}
-                label="探索场景"
-                topColor={accent}
-                edgeColor={accentEdge}
-                lightText
-              />
+              <View style={styles.cardButtonContainer}>
+                <GlowPillButton
+                  href={TO_SIM}
+                  label="马上开始"
+                  gradientColors={GREEN_GRAD}
+                  glowColor={GREEN_GLOW}
+                />
+              </View>
             </View>
           </View>
         </View>
@@ -205,74 +209,74 @@ export default function DecisionHome() {
   );
 }
 
-/** Enhanced 3D Button Component with better visual feedback */
-function Play3DButton({
+/** Neon/Glow pill button – lighter scheme */
+function GlowPillButton({
   href,
   label,
-  topColor,
-  edgeColor,
-  lightText,
+  gradientColors,
+  glowColor,
 }: {
   href: Href;
   label: string;
-  topColor: string;
-  edgeColor: string;
-  lightText?: boolean;
+  gradientColors: readonly [string, string];
+  glowColor: string;
 }) {
+  const haloPair = [glowColor, "transparent"] as const;
+
   return (
     <Link href={href} asChild>
       <Pressable>
         {({ pressed }) => (
-          <View
-            style={[
-              styles.btn3DWrap,
-              Platform.select({
-                android: {
-                  elevation: pressed ? 2 : 6,
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                },
-                ios: {
-                  shadowColor: "#000",
-                  shadowOpacity: pressed ? 0.1 : 0.15,
-                  shadowRadius: pressed ? 8 : 12,
-                  shadowOffset: { width: 0, height: pressed ? 2 : 6 },
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                },
-                default: {},
-              }) as any,
-            ]}
-          >
-            {/* Edge layer for 3D effect */}
-            <View
+          <View style={styles.glowWrap}>
+            {/* Softer, tighter halo */}
+            <LinearGradient
+              colors={haloPair}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 0 }}
               style={[
-                styles.btn3DEdge,
+                styles.halo,
                 {
-                  backgroundColor: edgeColor,
-                  top: pressed ? 3 : 6,
-                  height: pressed ? 8 : 12,
+                  opacity: pressed ? 0.7 : 0.9,
+                  transform: [{ scale: pressed ? 0.99 : 1 }],
                 },
               ]}
             />
 
-            {/* Top surface */}
-            <View
+            {/* Lighter filled surface */}
+            <LinearGradient
+              colors={gradientColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={[
-                styles.btn3DTop,
-                {
-                  backgroundColor: topColor,
-                  transform: [{ translateY: pressed ? 3 : 0 }],
-                },
+                styles.pill,
+                Platform.select({
+                  ios: {
+                    shadowColor: "#000",
+                    shadowOpacity: pressed ? 0.12 : 0.18,
+                    shadowRadius: pressed ? 8 : 12,
+                    shadowOffset: { width: 0, height: pressed ? 2 : 6 },
+                  },
+                  android: { elevation: pressed ? 2 : 4 },
+                }) as any,
+                { transform: [{ scale: pressed ? 0.985 : 1 }] },
               ]}
             >
-              <Text
-                style={[
-                  styles.btn3DText,
-                  { color: lightText ? "#FFFFFF" : "#FFFFFF" },
-                ]}
-              >
-                {label}
-              </Text>
-            </View>
+              {/* Brighter top highlight for airy feel */}
+              <LinearGradient
+                colors={
+                  [
+                    "rgba(255,255,255,0.55)",
+                    "rgba(255,255,255,0.15)",
+                    "transparent",
+                  ] as const
+                }
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={styles.pillHighlight}
+              />
+              <View style={styles.pillStroke} />
+              <Text style={styles.pillText}>{label}</Text>
+            </LinearGradient>
           </View>
         )}
       </Pressable>
@@ -280,35 +284,14 @@ function Play3DButton({
   );
 }
 
+const PILL_HEIGHT = 56;
+
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-  },
-  content: {
-    padding: 24,
-    gap: 32,
-  },
+  safe: { flex: 1 },
+  content: { padding: 24, gap: 32 },
 
-  // Header Section
-  headerSection: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    lineHeight: 22,
-  },
-
-  // History Section
-  historySection: {
-    gap: 12,
-  },
+  // History
+  historySection: { gap: 12 },
   historyCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -319,11 +302,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
-  historyContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
+  historyContent: { flexDirection: "row", alignItems: "center", gap: 16 },
   historyIcon: {
     width: 48,
     height: 48,
@@ -331,34 +310,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  historyText: {
-    flex: 1,
-    gap: 4,
-  },
-  historyTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  historySubtitle: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  chevronContainer: {
-    padding: 4,
-  },
+  historyText: { flex: 1, gap: 4 },
+  historyTitle: { fontSize: 17, fontWeight: "700" as const },
+  chevronContainer: { padding: 4 },
 
-  // Cards Section
-  cardsSection: {
-    gap: 16,
-  },
+  // Cards
+  cardsSection: { gap: 16 },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: "800" as const,
     letterSpacing: -0.3,
   },
-  cardsGrid: {
-    gap: 20,
-  },
+  cardsGrid: { gap: 20 },
   decisionCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -369,11 +332,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 4,
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 16,
-  },
+  cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 16 },
   cardIcon: {
     width: 56,
     height: 56,
@@ -381,63 +340,57 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cardTitleContainer: {
-    flex: 1,
-    gap: 8,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    lineHeight: 24,
-  },
-  cardDescription: {
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 22,
-  },
+  cardTitleContainer: { flex: 1, gap: 8 },
+  cardTitle: { fontSize: 18, fontWeight: "700" as const, lineHeight: 24 },
+  cardDescription: { fontSize: 15, fontWeight: "500" as const, lineHeight: 22 },
+  cardButtonContainer: { marginTop: 4, alignItems: "stretch" },
 
-  // Card Features
-  cardFeatures: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  featureTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: "transparent",
-  },
-  featureText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  /* Enhanced 3D Button */
-  btn3DWrap: {
-    position: "relative",
-    borderRadius: 16,
-  },
-  btn3DEdge: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    borderRadius: 16,
-  },
-  btn3DTop: {
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    flexDirection: "row",
+  /* Glow pill button */
+  glowWrap: {
+    alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    paddingVertical: 2,
   },
-  btn3DText: {
+  halo: {
+    position: "absolute",
+    width: "100%",
+    height: PILL_HEIGHT + 10,
+    borderRadius: 999,
+  },
+  pill: {
+    minHeight: PILL_HEIGHT,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    width: "100%",
+  },
+  pillHighlight: {
+    position: "absolute",
+    top: 0,
+    left: 2,
+    right: 2,
+    height: "50%",
+    borderTopLeftRadius: 999,
+    borderTopRightRadius: 999,
+  },
+  pillStroke: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+  },
+  pillText: {
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.25,
+    fontWeight: "800",
+    letterSpacing: 0.3,
   },
 });
