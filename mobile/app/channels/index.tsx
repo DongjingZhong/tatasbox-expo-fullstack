@@ -41,6 +41,15 @@ const DATA: Item[] = [
 
   /** -------- Self-Heal -------- */
   {
+    key: "goals",
+    title: "我的目标",
+    desc: "写下你的目标，愿望，渴望实现的",
+    icon: "flag-outline",
+    tint: "#F97316",
+    href: "/channels/goals" as Href,
+    group: "self-heal",
+  },
+  {
     key: "self-explore",
     title: "自我探索",
     desc: "与自己对话，梳理情绪与目标。",

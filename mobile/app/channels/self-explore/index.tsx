@@ -1,670 +1,358 @@
-import React, { useMemo, useRef, useState } from "react";
+// app/self-explore/index.tsx
+// All code comments in English only.
+
+import React, { useEffect, useMemo } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
+  ActivityIndicator,
+  Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
-  Animated,
-  TouchableWithoutFeedback,
-  TouchableOpacity,
-  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+
 import TopBar from "@/components/ui/TopBar";
 import { useTheme } from "@/providers/ThemeProvider";
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
+import { useAuthProfile } from "@/src/store/useAuthProfile"; // your store file
 
-type FieldName = "name" | "birthday" | "job" | "interests";
-type FieldAnimations = { [key in FieldName]: Animated.Value };
+export default function SelfExploreHome() {
+  const router = useRouter();
+  const { isDark } = useTheme();
 
-export default function SelfExploreSetup() {
-  const { isDark, colors } = useTheme();
+  // Select only the fields we need to avoid unnecessary rerenders
+  const profile = useAuthProfile((s) => s.profile);
+  const hydrated = useAuthProfile((s) => s.hydrated);
+  const hydrate = useAuthProfile((s) => s.hydrate);
 
-  // ---------- Theme tokens ----------
-  const t = useMemo(() => {
-    const ACCENT = colors?.primary ?? "#6366F1";
-    return {
-      accent: ACCENT,
-      success: "#10B981",
-      error: "#EF4444",
-      bg: isDark ? "#0B0F13" : "#F8FAFC",
-      card: isDark ? "rgba(255,255,255,0.03)" : "#FFFFFF",
-      cardBorder: isDark ? "rgba(255,255,255,0.06)" : "#E5E7EB",
-      text: isDark ? "#FFFFFF" : "#0F172A",
-      textSub: isDark ? "#94A3B8" : "#64748B",
-      label: isDark ? "#E2E8F0" : "#111827",
-      inputBg: isDark ? "rgba(255,255,255,0.05)" : "#FFFFFF",
-      inputBorder: isDark ? "rgba(255,255,255,0.12)" : "#E2E8F0",
-      inputBorderFocused: isDark ? ACCENT : ACCENT,
-      inputText: isDark ? "#F1F5F9" : "#0F172A",
-      deco: isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.10)",
-    };
-  }, [isDark, colors]);
-
-  // ---------- Form ----------
-  const [name, setName] = useState("");
-  const [birthday, setBirthday] = useState("");
-  const [job, setJob] = useState("");
-  const [interests, setInterests] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-
-  // 头像
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const onPickAvatar = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("需要权限", "请允许访问相册以选择照片");
-      return;
+  // Hydrate profile once when the screen mounts
+  useEffect(() => {
+    if (!hydrated) {
+      // Load from AsyncStorage into Zustand store
+      void hydrate();
     }
+  }, [hydrated, hydrate]);
 
-    const ipAny = ImagePicker as any;
-    const pickerOptions: any = {
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [1, 1],
-    };
-    if (ipAny?.MediaType?.Images) {
-      pickerOptions.mediaTypes = [ipAny.MediaType.Images];
-    }
-    const res = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+  // Simple theme tokens
+  const pageBg = isDark ? "#0F172A" : "#F8FAFC";
+  const cardBg = isDark ? "#111827" : "#FFFFFF";
+  const cardBorder = isDark ? "#1F2937" : "#E5E7EB";
+  const title = isDark ? "#F8FAFC" : "#0F172A";
+  const sub = isDark ? "#94A3B8" : "#6B7280";
+  const value = isDark ? "#E5E7EB" : "#111827";
+  const accent = "#FACC15";
 
-    if (!res.canceled && res.assets?.[0]?.uri) {
-      setAvatarUri(res.assets[0].uri);
-    }
-  };
+  // Derived UI helpers
+  const jobText = useMemo(() => {
+    if (!profile) return "";
+    // Prefer customJob if present, otherwise fallback to job
+    // Adjust to your schema if needed
+    // @ts-ignore - tolerate unknown keys
+    return profile.customJob?.trim?.() || profile.job || "";
+  }, [profile]);
 
-  // ---------- Animations ----------
-  const saveButtonScale = useRef(new Animated.Value(1)).current;
-  const saveButtonOpacity = useRef(new Animated.Value(1)).current;
-  const fieldAnimationsRef = useRef<FieldAnimations>({
-    name: new Animated.Value(0),
-    birthday: new Animated.Value(0),
-    job: new Animated.Value(0),
-    interests: new Animated.Value(0),
-  });
-  const A = fieldAnimationsRef.current;
+  // Render loading state while hydrating
+  if (!hydrated) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: pageBg }]}>
+        <TopBar
+          title={<Text style={{ color: title, fontSize: 18 }}>自我探索</Text>}
+        />
+        <View style={styles.loadingBox}>
+          <ActivityIndicator />
+          <Text style={{ marginTop: 8, color: sub }}>Loading profile…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  const handleFocus = (field: FieldName) => {
-    Animated.timing(A[field], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  };
-  const handleBlur = (field: FieldName) => {
-    Animated.timing(A[field], {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  // 重新设计的输入框样式 - 更干净、现代
-  const getFieldStyle = (field: FieldName) => ({
-    borderColor: A[field].interpolate({
-      inputRange: [0, 1],
-      outputRange: [t.inputBorder, t.inputBorderFocused],
-    }),
-    borderWidth: A[field].interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 2],
-    }),
-    backgroundColor: t.inputBg,
-    shadowColor: t.accent,
-    shadowOpacity: A[field].interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, isDark ? 0.15 : 0.08],
-    }),
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 },
-    transform: [
-      {
-        translateY: A[field].interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, -1],
-        }),
-      },
-    ],
-    elevation: A[field].interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 2],
-    }),
-  });
-
-  const animateButtonPress = () => {
-    Animated.parallel([
-      Animated.sequence([
-        Animated.timing(saveButtonScale, {
-          toValue: 0.95,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(saveButtonScale, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.sequence([
-        Animated.timing(saveButtonOpacity, {
-          toValue: 0.8,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(saveButtonOpacity, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  };
-
-  const isFormValid =
-    name.trim() && birthday.trim() && job.trim() && interests.trim();
-
-  const onSave = async () => {
-    const n = name.trim();
-    const b = birthday.trim();
-    const j = job.trim();
-    const i = interests.trim();
-
-    if (!n || !b || !j || !i) {
-      Alert.alert("请完善信息", "请填写完所有字段后再保存");
-      return;
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(b)) {
-      Alert.alert("生日格式不正确", "请使用 YYYY-MM-DD 格式，如 1990-05-21");
-      return;
-    }
-
-    animateButtonPress();
-    setIsSaving(true);
-    await new Promise((r) => setTimeout(r, 800));
-
-    router.push({
-      pathname: "./home",
-      params: { name: n, birthday: b, job: j, interests: i },
-    });
-  };
-
-  // ---------- Styles ----------
-  const styles = useMemo(
-    () =>
-      StyleSheet.create({
-        safe: { flex: 1, backgroundColor: t.bg },
-        container: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-
-        header: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 32,
-        },
-        titleContainer: { flex: 1 },
-        title: {
-          fontSize: 32,
-          fontWeight: "800",
-          color: t.text,
-          marginBottom: 8,
-          letterSpacing: -0.5,
-        },
-        subtitle: { fontSize: 16, color: t.textSub, fontWeight: "500" },
-
-        // 头像
-        avatarBtn: {
-          width: 60,
-          height: 60,
-          borderRadius: 30,
-          backgroundColor: t.deco,
-          borderWidth: 1.5,
-          borderColor: t.cardBorder,
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-        },
-        avatarImage: { width: "100%", height: "100%" },
-
-        formCard: {
-          backgroundColor: t.card,
-          borderRadius: 20,
-          padding: 24,
-          borderWidth: 1,
-          borderColor: t.cardBorder,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: isDark ? 0.2 : 0.04,
-          shadowRadius: 8,
-          elevation: 4,
-        },
-        formTitle: {
-          fontSize: 20,
-          fontWeight: "700",
-          color: t.text,
-          marginBottom: 8,
-        },
-        formDescription: {
-          fontSize: 14,
-          color: t.textSub,
-          lineHeight: 20,
-          marginBottom: 28,
-        },
-
-        field: { marginBottom: 28 },
-        fieldHeader: {
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 10,
-        },
-        fieldIcon: {
-          width: 28,
-          height: 28,
-          borderRadius: 14,
-          backgroundColor: isDark
-            ? "rgba(99,102,241,0.16)"
-            : "rgba(99,102,241,0.10)",
-          justifyContent: "center",
-          alignItems: "center",
-          marginRight: 10,
-        },
-        fieldIconText: { fontSize: 13, fontWeight: "500" },
-        label: {
-          color: t.label,
-          fontSize: 15,
-          fontWeight: "600",
-          marginRight: 4,
-        },
-        required: { color: t.error, fontSize: 14, fontWeight: "600" },
-
-        // 重新设计的输入框容器
-        inputContainer: {
-          borderRadius: 12,
-          borderWidth: 1,
-          paddingHorizontal: 16,
-          overflow: "hidden",
-          backgroundColor: t.inputBg,
-        },
-        input: {
-          color: t.inputText,
-          fontSize: 16,
-          fontWeight: "500",
-          paddingVertical: 14,
-          minHeight: 48,
-          // 去掉 RN Web 的默认黄色 outline
-          outlineWidth: 0 as any,
-          outlineStyle: "none" as any,
-          outlineColor: "transparent" as any,
-        },
-        multilineContainer: { minHeight: 100 },
-        multiline: {
-          minHeight: 80,
-          paddingTop: 14,
-          textAlignVertical: "top",
-        },
-        hint: {
-          fontSize: 12,
-          color: t.textSub,
-          marginTop: 8,
-          fontStyle: "italic",
-        },
-        charHint: {
-          fontSize: 12,
-          color: t.textSub,
-          textAlign: "right",
-          marginTop: 6,
-        },
-
-        // 重新设计的保存按钮 - 更干净、清新
-        saveButton: {
-          borderRadius: 14,
-          marginTop: 20,
-          marginBottom: 8,
-          overflow: "hidden",
-          shadowColor: t.success,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: isDark ? 0.25 : 0.12,
-          shadowRadius: 12,
-          elevation: 4,
-        },
-        saveButtonInner: {
-          backgroundColor: t.success,
-          paddingVertical: 16,
-          paddingHorizontal: 24,
-          position: "relative",
-          overflow: "hidden",
-          alignItems: "center",
-          justifyContent: "center",
-        },
-        // 禁用态
-        saveButtonInnerDisabled: {
-          backgroundColor: isDark
-            ? "rgba(16,185,129,0.4)"
-            : "rgba(16,185,129,0.6)",
-        },
-        saveButtonDisabled: {
-          shadowOpacity: isDark ? 0.1 : 0.06,
-          elevation: 1,
-        },
-        saveButtonLoading: {
-          shadowColor: isDark ? "#6EE7B7" : "#34D399",
-          shadowOpacity: isDark ? 0.3 : 0.2,
-        },
-
-        saveButtonContent: {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 10,
-        },
-        saveButtonIconContainer: {
-          width: 20,
-          height: 20,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        saveButtonText: {
-          color: "#FFFFFF",
-          fontSize: 16,
-          fontWeight: "600",
-          letterSpacing: 0.2,
-        },
-        // 更细腻的按钮光泽效果
-        buttonShine: {
-          position: "absolute",
-          top: 0,
-          left: "-100%",
-          width: "60%",
-          height: "100%",
-          backgroundColor: "rgba(255,255,255,0.15)",
-          transform: [{ skewX: "-15deg" }],
-        },
-        // 更细腻的边框光晕
-        buttonGlow: {
-          ...StyleSheet.absoluteFillObject,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: isDark
-            ? "rgba(255,255,255,0.15)"
-            : "rgba(255,255,255,0.2)",
-        },
-        loadingSpinner: {
-          width: 18,
-          height: 18,
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        spinnerInner: {
-          width: 14,
-          height: 14,
-          borderRadius: 7,
-          borderWidth: 1.5,
-          borderColor: "#FFFFFF",
-          borderTopColor: "transparent",
-        },
-        saveHint: {
-          fontSize: 12,
-          color: t.textSub,
-          textAlign: "center",
-          marginTop: 10,
-          fontStyle: "italic",
-        },
-      }),
-    [t, isDark]
-  );
-
-  const FieldIcon = ({ emoji }: { emoji: string }) => (
-    <View style={styles.fieldIcon}>
-      <Text style={styles.fieldIconText}>{emoji}</Text>
+  const Header = () => (
+    <View style={styles.headerRow}>
+      <Text style={[styles.headerTitle, { color: title }]}>自我探索</Text>
+      <View style={styles.headerActions}>
+        <Pressable
+          style={styles.iconBtn}
+          onPress={() => router.push("/profile")}
+          android_ripple={{ color: "#00000020", borderless: true }}
+        >
+          <Ionicons name="create-outline" size={20} color={accent} />
+          <Text style={[styles.iconBtnText, { color: accent }]}>编辑资料</Text>
+        </Pressable>
+        <Pressable
+          style={styles.iconBtn}
+          onPress={() => void hydrate()}
+          android_ripple={{ color: "#00000020", borderless: true }}
+        >
+          <Ionicons name="refresh-outline" size={20} color={accent} />
+          <Text style={[styles.iconBtnText, { color: accent }]}>重新加载</Text>
+        </Pressable>
+      </View>
     </View>
   );
 
-  const PLACEHOLDER = t.textSub;
-
   return (
-    <SafeAreaView style={styles.safe}>
-      <TopBar left="back" />
-      <KeyboardAvoidingView
-        behavior={Platform.select({ ios: "padding", android: undefined })}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <SafeAreaView style={[styles.container, { backgroundColor: pageBg }]}>
+      <TopBar
+        title={<Text style={{ color: title, fontSize: 18 }}>自我探索</Text>}
+      />
+      <ScrollView contentContainerStyle={styles.scrollBody} bounces>
+        <Header />
+
+        {/* Profile Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: cardBg, borderColor: cardBorder },
+          ]}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <Text style={styles.title}>自我探索</Text>
-              <Text style={styles.subtitle}>开启内心对话之旅</Text>
-            </View>
-
-            {/* 头像 */}
-            <TouchableOpacity
-              style={styles.avatarBtn}
-              onPress={onPickAvatar}
-              activeOpacity={0.85}
-            >
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-              ) : (
-                <Ionicons
-                  name="camera"
-                  size={22}
-                  color={isDark ? "#CBD5E1" : "#475569"}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Form */}
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>基本资料</Text>
-            <Text style={styles.formDescription}>
-              告诉我们一些关于你的信息，让我们更好地为你提供个性化的探索体验
-            </Text>
-
-            {/* Name */}
-            <View style={styles.field}>
-              <View style={styles.fieldHeader}>
-                <FieldIcon emoji="👤" />
-                <Text style={styles.label}>名字</Text>
-                <Text style={styles.required}>*</Text>
-              </View>
-              <TouchableWithoutFeedback onPress={() => handleFocus("name")}>
-                <Animated.View
-                  style={[styles.inputContainer, getFieldStyle("name")]}
-                >
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="请输入您的姓名"
-                    placeholderTextColor={PLACEHOLDER}
-                    style={styles.input}
-                    returnKeyType="next"
-                    onFocus={() => handleFocus("name")}
-                    onBlur={() => handleBlur("name")}
-                    cursorColor={t.accent}
-                    selectionColor={
-                      isDark ? "rgba(148,163,184,0.5)" : "rgba(99,102,241,0.25)"
-                    }
-                  />
-                </Animated.View>
-              </TouchableWithoutFeedback>
-            </View>
-
-            {/* Birthday */}
-            <View style={styles.field}>
-              <View style={styles.fieldHeader}>
-                <FieldIcon emoji="🎂" />
-                <Text style={styles.label}>生日</Text>
-                <Text style={styles.required}>*</Text>
-              </View>
-              <TouchableWithoutFeedback onPress={() => handleFocus("birthday")}>
-                <Animated.View
-                  style={[styles.inputContainer, getFieldStyle("birthday")]}
-                >
-                  <TextInput
-                    value={birthday}
-                    onChangeText={setBirthday}
-                    placeholder="YYYY-MM-DD（如 1995-07-16）"
-                    placeholderTextColor={PLACEHOLDER}
-                    style={styles.input}
-                    keyboardType="numbers-and-punctuation"
-                    returnKeyType="next"
-                    onFocus={() => handleFocus("birthday")}
-                    onBlur={() => handleBlur("birthday")}
-                    cursorColor={t.accent}
-                    selectionColor={
-                      isDark ? "rgba(148,163,184,0.5)" : "rgba(99,102,241,0.25)"
-                    }
-                  />
-                </Animated.View>
-              </TouchableWithoutFeedback>
-              <Text style={styles.hint}>
-                我们将根据年龄提供更适合的探索内容
-              </Text>
-            </View>
-
-            {/* Job */}
-            <View style={styles.field}>
-              <View style={styles.fieldHeader}>
-                <FieldIcon emoji="💼" />
-                <Text style={styles.label}>当前职业</Text>
-                <Text style={styles.required}>*</Text>
-              </View>
-              <TouchableWithoutFeedback onPress={() => handleFocus("job")}>
-                <Animated.View
-                  style={[styles.inputContainer, getFieldStyle("job")]}
-                >
-                  <TextInput
-                    value={job}
-                    onChangeText={setJob}
-                    placeholder="例如：产品经理 / 学生 / 销售 / 自由职业者"
-                    placeholderTextColor={PLACEHOLDER}
-                    style={styles.input}
-                    returnKeyType="next"
-                    onFocus={() => handleFocus("job")}
-                    onBlur={() => handleBlur("job")}
-                    cursorColor={t.accent}
-                    selectionColor={
-                      isDark ? "rgba(148,163,184,0.5)" : "rgba(99,102,241,0.25)"
-                    }
-                  />
-                </Animated.View>
-              </TouchableWithoutFeedback>
-            </View>
-
-            {/* Interests */}
-            <View style={styles.field}>
-              <View style={styles.fieldHeader}>
-                <FieldIcon emoji="🎯" />
-                <Text style={styles.label}>兴趣爱好</Text>
-                <Text style={styles.required}>*</Text>
-              </View>
-              <TouchableWithoutFeedback
-                onPress={() => handleFocus("interests")}
-              >
-                <Animated.View
-                  style={[
-                    styles.inputContainer,
-                    styles.multilineContainer,
-                    getFieldStyle("interests"),
-                  ]}
-                >
-                  <TextInput
-                    value={interests}
-                    onChangeText={setInterests}
-                    placeholder="用逗号分隔：阅读, 跑步, 摄影, 音乐..."
-                    placeholderTextColor={PLACEHOLDER}
-                    style={[styles.input, styles.multiline]}
-                    multiline
-                    textAlignVertical="top"
-                    maxLength={100}
-                    onFocus={() => handleFocus("interests")}
-                    onBlur={() => handleBlur("interests")}
-                    cursorColor={t.accent}
-                    selectionColor={
-                      isDark ? "rgba(148,163,184,0.5)" : "rgba(99,102,241,0.25)"
-                    }
-                  />
-                  <Text style={styles.charHint}>{interests.length}/100</Text>
-                </Animated.View>
-              </TouchableWithoutFeedback>
-            </View>
-
-            {/* 重新设计的保存按钮 */}
-            <Animated.View
-              style={[
-                {
-                  transform: [{ scale: saveButtonScale }],
-                  opacity: saveButtonOpacity,
-                },
-              ]}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  (!isFormValid || isSaving) && styles.saveButtonDisabled,
-                  isSaving && styles.saveButtonLoading,
-                ]}
-                onPress={onSave}
-                disabled={!isFormValid || isSaving}
-                activeOpacity={0.9}
-              >
-                <View
-                  style={[
-                    styles.saveButtonInner,
-                    (!isFormValid || isSaving) &&
-                      styles.saveButtonInnerDisabled,
-                  ]}
-                >
-                  <View style={styles.saveButtonContent}>
-                    <View style={styles.saveButtonIconContainer}>
-                      {isSaving ? (
-                        <View style={styles.loadingSpinner}>
-                          <View style={styles.spinnerInner} />
-                        </View>
-                      ) : (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={18}
-                          color="#FFFFFF"
-                        />
-                      )}
+          {profile ? (
+            <>
+              {/* Avatar row */}
+              <View style={styles.avatarRow}>
+                <View style={styles.avatarWrap}>
+                  {profile.avatar ? (
+                    <Image
+                      source={{ uri: profile.avatar }}
+                      style={styles.avatar}
+                    />
+                  ) : (
+                    <View style={[styles.avatar, styles.avatarFallback]}>
+                      <Ionicons name="person-outline" size={32} color={sub} />
                     </View>
-                    <Text style={styles.saveButtonText}>
-                      {isSaving ? "保存中..." : "保存资料"}
-                    </Text>
-                  </View>
-                  <Animated.View
-                    style={[
-                      styles.buttonShine,
-                      {
-                        opacity: saveButtonOpacity.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 1],
-                        }),
-                      },
-                    ]}
-                  />
+                  )}
                 </View>
-                <View style={styles.buttonGlow} />
-              </TouchableOpacity>
-            </Animated.View>
+                <View style={styles.nameWrap}>
+                  <Text style={[styles.name, { color: value }]}>
+                    {profile.name || "未命名用户"}
+                  </Text>
+                  <Text style={{ color: sub, marginTop: 4 }}>
+                    {profile.email || "暂无邮箱"}
+                  </Text>
+                </View>
+              </View>
 
-            <Text style={styles.saveHint}>保存后可随时返回修改您的资料</Text>
-          </View>
+              {/* Fields */}
+              <View style={styles.divider} />
+              <Field
+                label="语言"
+                value={profile.language || "未设置"}
+                valueColor={value}
+                labelColor={sub}
+              />
+              <Field
+                label="生日"
+                value={profile.birthday || "未设置"}
+                valueColor={value}
+                labelColor={sub}
+              />
+              <Field
+                label="职业"
+                value={jobText || "未设置"}
+                valueColor={value}
+                labelColor={sub}
+              />
+              <Field
+                label="兴趣"
+                value={
+                  Array.isArray(profile.interests) &&
+                  profile.interests.length > 0
+                    ? profile.interests.join(", ")
+                    : "未设置"
+                }
+                valueColor={value}
+                labelColor={sub}
+              />
+              {profile.quote ? (
+                <>
+                  <View style={styles.divider} />
+                  <Text style={{ color: sub, marginBottom: 6 }}>
+                    座右铭 / 名言
+                  </Text>
+                  <Text style={{ color: value, lineHeight: 22 }}>
+                    {profile.quote}
+                  </Text>
+                </>
+              ) : null}
+            </>
+          ) : (
+            // Empty state
+            <View style={styles.emptyWrap}>
+              <Ionicons
+                name="information-circle-outline"
+                size={28}
+                color={sub}
+              />
+              <Text style={{ color: sub, marginTop: 8 }}>
+                当前设备没有找到用户资料。
+              </Text>
+              <Pressable
+                style={[styles.ctaBtn, { backgroundColor: accent }]}
+                onPress={() => router.push("/profile")}
+              >
+                <Text style={styles.ctaBtnText}>去填写资料</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
 
-          <View style={{ height: 140 }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {/* Explore tip */}
+        <View
+          style={[
+            styles.tipCard,
+            { backgroundColor: cardBg, borderColor: cardBorder },
+          ]}
+        >
+          <Ionicons name="bulb-outline" size={18} color={accent} />
+          <Text
+            style={{ marginLeft: 8, color: value, flex: 1, lineHeight: 20 }}
+          >
+            你的“自我探索”问题将参考以上资料进行个性化提问。完善资料可获得更贴合你的探索路径。
+          </Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
+
+function Field({
+  label,
+  value,
+  labelColor,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  labelColor: string;
+  valueColor: string;
+}) {
+  return (
+    <View style={styles.fieldRow}>
+      <Text style={[styles.fieldLabel, { color: labelColor }]}>{label}</Text>
+      <Text style={[styles.fieldValue, { color: valueColor }]}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  headerRow: {
+    marginTop: 8,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  iconBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+  },
+  iconBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  loadingBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  card: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+  },
+  avatarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarWrap: {
+    marginRight: 12,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#00000010",
+  },
+  nameWrap: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  divider: {
+    height: 1,
+    opacity: 0.12,
+    backgroundColor: "#94A3B8",
+    marginVertical: 12,
+  },
+  fieldRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginVertical: 6,
+    gap: 12,
+  },
+  fieldLabel: {
+    width: 72,
+    fontSize: 14,
+  },
+  fieldValue: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    lineHeight: 20,
+  },
+  emptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    gap: 10,
+  },
+  ctaBtn: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  ctaBtnText: {
+    color: "#111827",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  tipCard: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+});

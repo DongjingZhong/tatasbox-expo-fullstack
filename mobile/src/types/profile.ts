@@ -11,9 +11,11 @@ export interface UserProfile {
   job: string; // required
   interests: string[]; // required (>=1)
   birthday: string; // required, ISO date "YYYY-MM-DD"
-  lang: "zh" | "en" | "es";
+  language?: string; // ← new
+  lang?: string; // ← legacy/compat
   createdAt: number;
   updatedAt: number;
+  quote?: string; // ← new
 }
 
 export function isProfileComplete(p?: Partial<UserProfile> | null): boolean {
