@@ -67,7 +67,7 @@ export default function GoalsScreen() {
   const [draft, setDraft] = useState("");
   const [draftImage, setDraftImage] = useState<string | undefined>(undefined);
 
-  // Edit modal (non-transparent)
+  // Edit modal (text only)
   const [showEdit, setShowEdit] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -82,6 +82,9 @@ export default function GoalsScreen() {
   const [congratsGoal, setCongratsGoal] = useState("");
   const congratsScale = useRef(new Animated.Value(0.9)).current;
   const congratsOpacity = useRef(new Animated.Value(0)).current;
+
+  // Text expand/collapse state for current card
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!hydrated) hydrate();
@@ -99,11 +102,16 @@ export default function GoalsScreen() {
     });
   }, [goals, mode]);
 
-  // Reset index when data changes
+  // Reset index and swipe when data changes
   useEffect(() => {
     setIndex(0);
     pan.setValue({ x: 0, y: 0 });
   }, [mode, goals, pan]);
+
+  // Reset expand state when current card changes
+  useEffect(() => {
+    setExpanded(false);
+  }, [source, index]);
 
   const nextCard = useCallback(() => {
     setIndex((i) => Math.min(i + 1, Math.max(source.length - 1, 0)));
@@ -178,7 +186,7 @@ export default function GoalsScreen() {
     setMode("pending");
   };
 
-  // Edit helpers
+  // Edit helpers (text modal)
   const openEdit = (id: string, text: string) => {
     setEditId(id);
     setEditText(text);
@@ -313,9 +321,19 @@ export default function GoalsScreen() {
     : "rgba(255,255,255,0.75)";
   const cardBorder = isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.06)";
 
+  // Unified edit menu: change image OR edit text
+  const openEditMenu = () => {
+    if (!current) return;
+    Alert.alert("编辑", "请选择要编辑的内容", [
+      { text: "更换图片", onPress: pickImageForCurrent },
+      { text: "编辑文字", onPress: () => openEdit(current.id, current.text) },
+      { text: "取消", style: "cancel" },
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Beautiful page gradient background */}
+      {/* Page gradient */}
       <LinearGradient
         colors={
           isDark
@@ -419,7 +437,7 @@ export default function GoalsScreen() {
               创建你的目标，然后默默实现它；当你实现之后，再点击「已完成」。
             </AppText>
 
-            {/* Round create button */}
+            {/* Create button */}
             <IconCircleButton
               icon="add"
               onPress={openCreate}
@@ -431,7 +449,7 @@ export default function GoalsScreen() {
           </View>
         )}
 
-        {/* Current card with glow/shadow + semi-transparent glass */}
+        {/* Current card */}
         {current && (
           <Animated.View
             {...responder.panHandlers}
@@ -446,14 +464,12 @@ export default function GoalsScreen() {
               },
               isDark
                 ? {
-                    // glow in dark mode
                     shadowColor: "#60A5FA",
                     shadowOpacity: 0.45,
                     shadowRadius: 16,
                     shadowOffset: { width: 0, height: 10 },
                   }
                 : {
-                    // soft shadow in light mode
                     shadowColor: "#000",
                     shadowOpacity: 0.08,
                     shadowRadius: 12,
@@ -472,41 +488,27 @@ export default function GoalsScreen() {
                   { backgroundColor: cardBg, borderColor: cardBorder },
                 ]}
               >
-                {/* Status (left) */}
+                {/* ---------- Top bar (index at top of card, not over image) ---------- */}
                 <View
                   style={[
-                    styles.statusPill,
-                    { backgroundColor: current.done ? "#DCFCE7" : "#FEF3C7" },
+                    styles.cardTopBar,
+                    {
+                      borderBottomColor: cardBorder,
+                      backgroundColor: isDark
+                        ? "rgba(2,6,23,0.45)"
+                        : "rgba(255,255,255,0.6)",
+                    },
                   ]}
                 >
                   <AppText
-                    weight="700"
-                    style={{ color: current.done ? "#16A34A" : "#D97706" }}
+                    weight="800"
+                    style={{ color: isDark ? "#E5E7EB" : "#111827" }}
                   >
-                    {current.done ? "已完成" : "未完成"}
+                    {displayIndex}/{total} {modeLabel}
                   </AppText>
                 </View>
 
-                {/* Counter (right) */}
-                <View style={styles.counterWrap}>
-                  <LinearGradient
-                    colors={
-                      isDark ? ["#A7F3D0", "#93C5FD"] : ["#FDE68A", "#A7F3D0"]
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.counterBg}
-                  >
-                    <AppText
-                      weight="800"
-                      style={{ color: isDark ? "#0B1220" : "#111827" }}
-                    >
-                      {displayIndex}/{total} {modeLabel}
-                    </AppText>
-                  </LinearGradient>
-                </View>
-
-                {/* Top image */}
+                {/* ---------- Image area with single status tag at top-left ---------- */}
                 <View style={{ position: "relative" }}>
                   {current.image ? (
                     <Image
@@ -535,49 +537,91 @@ export default function GoalsScreen() {
                     </LinearGradient>
                   )}
 
-                  {/* Change image */}
-                  <Pressable
-                    onPress={pickImageForCurrent}
-                    style={({ pressed }) => [
-                      styles.editImageBtn,
-                      { opacity: pressed ? 0.85 : 1 },
+                  {/* Single status pill only (kept on image's top-left) */}
+                  <View
+                    style={[
+                      styles.statusPill,
+                      { backgroundColor: current.done ? "#DCFCE7" : "#FEF3C7" },
                     ]}
                   >
-                    <Ionicons name="image-outline" size={16} color="#fff" />
-                    <AppText weight="700" style={{ color: "#fff" }}>
-                      更换图片
+                    <AppText
+                      weight="700"
+                      style={{ color: current.done ? "#16A34A" : "#D97706" }}
+                    >
+                      {current.done ? "已完成" : "未完成"}
                     </AppText>
-                  </Pressable>
+                  </View>
 
-                  {/* Edit text */}
+                  {/* NOTE: removed floating edit/change-image buttons to avoid covering image */}
+                </View>
+
+                {/* ---------- Meta row: created time (left) + unified Edit (right) ---------- */}
+                <View style={{ paddingHorizontal: 14, paddingTop: 10 }}>
+                  <View style={styles.metaRow}>
+                    <AppText variant="caption" muted>
+                      创建时间：{formatCN(current.createdAt)}
+                    </AppText>
+
+                    <Pressable
+                      onPress={openEditMenu}
+                      style={({ pressed }) => [
+                        styles.editInlineBtn,
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(255,255,255,0.08)"
+                            : "rgba(0,0,0,0.06)",
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="pencil"
+                        size={14}
+                        color={isDark ? "#E5E7EB" : "#111827"}
+                      />
+                      <AppText
+                        weight="700"
+                        style={{ color: isDark ? "#E5E7EB" : "#111827" }}
+                      >
+                        编辑
+                      </AppText>
+                    </Pressable>
+                  </View>
+                </View>
+
+                {/* ---------- Text content: 3 lines collapsed, tap to expand ---------- */}
+                <View style={{ flex: 1, paddingHorizontal: 14, paddingTop: 6 }}>
+                  {expanded ? (
+                    <ScrollView style={{ flex: 1 }}>
+                      <AppText
+                        style={{ color: isDark ? "#E5E7EB" : "#111827" }}
+                      >
+                        {current.text}
+                      </AppText>
+                    </ScrollView>
+                  ) : (
+                    <Pressable onPress={() => setExpanded(true)}>
+                      <AppText
+                        numberOfLines={3}
+                        ellipsizeMode="tail"
+                        style={{ color: isDark ? "#E5E7EB" : "#111827" }}
+                      >
+                        {current.text}
+                      </AppText>
+                    </Pressable>
+                  )}
+
                   <Pressable
-                    onPress={() => openEdit(current.id, current.text)}
-                    style={({ pressed }) => [
-                      styles.editBtn,
-                      { opacity: pressed ? 0.85 : 1 },
-                    ]}
+                    onPress={() => setExpanded((v) => !v)}
+                    style={{ alignSelf: "flex-start", marginTop: 6 }}
                   >
-                    <Ionicons name="pencil" size={16} color="#111827" />
-                    <AppText weight="700" style={{ color: "#111827" }}>
-                      编辑
+                    <AppText variant="caption" muted>
+                      {expanded ? "收起" : "展开全部"}
                     </AppText>
                   </Pressable>
                 </View>
 
-                {/* Text area */}
-                <View style={{ flex: 1, padding: 14 }}>
-                  <AppText variant="caption" muted>
-                    创建时间：{formatCN(current.createdAt)}
-                  </AppText>
-
-                  <ScrollView style={{ flex: 1, marginTop: 6 }}>
-                    <AppText style={{ color: isDark ? "#E5E7EB" : "#111827" }}>
-                      {current.text}
-                    </AppText>
-                  </ScrollView>
-                </View>
-
-                {/* Bottom round icon buttons: Delete | Check (bigger) | Create */}
+                {/* ---------- Bottom round icon buttons ---------- */}
                 <View style={styles.cardActionsRow}>
                   <IconCircleButton
                     icon="trash"
@@ -591,7 +635,7 @@ export default function GoalsScreen() {
                     onPress={handleConfirmToggle}
                     colors={["#34D399", "#10B981"] as const}
                     glowColor="#10B981"
-                    size={66} // bigger center button
+                    size={66}
                   />
                   <IconCircleButton
                     icon="add"
@@ -607,7 +651,7 @@ export default function GoalsScreen() {
         )}
       </View>
 
-      {/* Create modal - NOT transparent */}
+      {/* Create modal */}
       <Modal
         animationType="slide"
         visible={showCreate}
@@ -687,7 +731,6 @@ export default function GoalsScreen() {
 
             <View style={{ height: 10 }} />
             <View style={styles.modalActions}>
-              {/* High-contrast cancel button */}
               <Pressable
                 onPress={closeCreate}
                 style={({ pressed }) => [
@@ -726,7 +769,7 @@ export default function GoalsScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Edit modal - NOT transparent (kept) */}
+      {/* Edit modal */}
       <Modal
         animationType="slide"
         visible={showEdit}
@@ -814,7 +857,7 @@ export default function GoalsScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Celebration modal - NOT transparent now */}
+      {/* Celebration modal */}
       <Modal
         animationType="fade"
         visible={showCongrats}
@@ -963,7 +1006,6 @@ function IconCircleButton({
 }
 
 /** ---------- Styles ---------- */
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
 
@@ -1015,6 +1057,16 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
+  // New: top bar at card top (index/total)
+  cardTopBar: {
+    height: 36,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+
+  // Single status pill kept on image
   statusPill: {
     position: "absolute",
     top: 10,
@@ -1025,6 +1077,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
 
+  // Old counter removed from image overlay (kept style only if needed)
   counterWrap: {
     position: "absolute",
     top: 10,
@@ -1039,6 +1092,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
 
+  // Meta row under image: time + Edit
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  editInlineBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+
   cardActionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1048,29 +1117,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
 
+  // (floating edit buttons removed from image)
   editImageBtn: {
-    position: "absolute",
-    right: 10,
-    bottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    display: "none",
   },
   editBtn: {
-    position: "absolute",
-    left: 10,
-    bottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    display: "none",
   },
 
   emptyCard: {
