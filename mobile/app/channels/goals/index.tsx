@@ -345,7 +345,7 @@ export default function GoalsScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      <TopBar title={<AppText weight="800">我的目标</AppText>} />
+      <TopBar left="back" />
 
       {/* Tabs */}
       <View style={styles.tabsWrap}>
@@ -488,7 +488,7 @@ export default function GoalsScreen() {
                   { backgroundColor: cardBg, borderColor: cardBorder },
                 ]}
               >
-                {/* ---------- Top bar (index at top of card, not over image) ---------- */}
+                {/* ---------- Top bar (index/total not over image) ---------- */}
                 <View
                   style={[
                     styles.cardTopBar,
@@ -508,7 +508,7 @@ export default function GoalsScreen() {
                   </AppText>
                 </View>
 
-                {/* ---------- Image area with single status tag at top-left ---------- */}
+                {/* ---------- Image with single status tag ---------- */}
                 <View style={{ position: "relative" }}>
                   {current.image ? (
                     <Image
@@ -537,7 +537,6 @@ export default function GoalsScreen() {
                     </LinearGradient>
                   )}
 
-                  {/* Single status pill only (kept on image's top-left) */}
                   <View
                     style={[
                       styles.statusPill,
@@ -551,11 +550,9 @@ export default function GoalsScreen() {
                       {current.done ? "已完成" : "未完成"}
                     </AppText>
                   </View>
-
-                  {/* NOTE: removed floating edit/change-image buttons to avoid covering image */}
                 </View>
 
-                {/* ---------- Meta row: created time (left) + unified Edit (right) ---------- */}
+                {/* ---------- Meta row: time + Edit ---------- */}
                 <View style={{ paddingHorizontal: 14, paddingTop: 10 }}>
                   <View style={styles.metaRow}>
                     <AppText variant="caption" muted>
@@ -589,7 +586,7 @@ export default function GoalsScreen() {
                   </View>
                 </View>
 
-                {/* ---------- Text content: 3 lines collapsed, tap to expand ---------- */}
+                {/* ---------- Text content: 3 lines collapsed ---------- */}
                 <View style={{ flex: 1, paddingHorizontal: 14, paddingTop: 6 }}>
                   {expanded ? (
                     <ScrollView style={{ flex: 1 }}>
@@ -621,7 +618,7 @@ export default function GoalsScreen() {
                   </Pressable>
                 </View>
 
-                {/* ---------- Bottom round icon buttons ---------- */}
+                {/* ---------- Bottom actions ---------- */}
                 <View style={styles.cardActionsRow}>
                   <IconCircleButton
                     icon="trash"
@@ -702,8 +699,8 @@ export default function GoalsScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.modalImage}
                 >
-                  <Ionicons name="image-outline" size={42} color="#fff" />
-                  <AppText muted>点击添加图片</AppText>
+                  <Ionicons name="camera-outline" size={42} color="#fff" />
+                  {/* <AppText muted>点击添加图片</AppText> */}
                 </LinearGradient>
               )}
             </Pressable>
@@ -713,10 +710,11 @@ export default function GoalsScreen() {
                 value={draft}
                 onChangeText={(t) => t.length <= MAX_LEN && setDraft(t)}
                 placeholder="写下你清晰可执行的目标（最多 300 字）"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#6B7280"
+                selectionColor="#F97316"
                 style={[
                   styles.modalInput,
-                  { color: isDark ? "#E5E7EB" : "#111827", minHeight: 140 },
+                  { color: "#111827", minHeight: 140 }, // always dark text on white bg
                 ]}
                 multiline
               />
@@ -730,7 +728,7 @@ export default function GoalsScreen() {
             </View>
 
             <View style={{ height: 10 }} />
-            <View style={styles.modalActions}>
+            <View className="actions" style={styles.modalActions}>
               <Pressable
                 onPress={closeCreate}
                 style={({ pressed }) => [
@@ -807,10 +805,11 @@ export default function GoalsScreen() {
               value={editText}
               onChangeText={(t) => t.length <= MAX_LEN && setEditText(t)}
               placeholder="更新你的目标内容（最多 300 字）"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
+              selectionColor="#F97316"
               style={[
                 styles.modalInput,
-                { color: isDark ? "#E5E7EB" : "#111827", minHeight: 140 },
+                { color: "#111827", minHeight: 140 }, // always dark text on white bg
               ]}
               multiline
             />
@@ -1077,7 +1076,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
 
-  // Old counter removed from image overlay (kept style only if needed)
+  // (legacy counter styles kept in case you reuse)
   counterWrap: {
     position: "absolute",
     top: 10,
@@ -1117,13 +1116,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
 
-  // (floating edit buttons removed from image)
-  editImageBtn: {
-    display: "none",
-  },
-  editBtn: {
-    display: "none",
-  },
+  // Floating edit buttons removed from image
+  editImageBtn: { display: "none" },
+  editBtn: { display: "none" },
 
   emptyCard: {
     width: "100%",
@@ -1159,7 +1154,7 @@ const styles = StyleSheet.create({
   modalInput: {
     borderRadius: 12,
     padding: 12,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "rgba(255,255,255,0.9)", // keep white background
   },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
   modalBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
