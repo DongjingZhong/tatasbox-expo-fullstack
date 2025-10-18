@@ -59,7 +59,7 @@ export default function ProfileForm({ mode }: { mode: Mode }) {
       inputBg: isDark ? "#1E293B" : "#FFFFFF",
       inputText: isDark ? "#F1F5F9" : "#0F172A",
       placeholder: isDark ? "#64748B" : "#94A3B8",
-      chipBg: isDark ? "#1E293B" : "#F1F5F9",
+      chipBg: isDark ? "#1E293B" : "#F1F9FF",
       chipOnBg: isDark ? "#3B82F6" : "#2563EB",
       chipText: isDark ? "#CBD5E1" : "#475569",
       chipOnText: "#FFFFFF",
@@ -70,14 +70,28 @@ export default function ProfileForm({ mode }: { mode: Mode }) {
     };
   }, [isDark]);
 
+  // Use new ImagePicker MediaType API: only allow images
   const pickAvatar = async () => {
+    // Ask for media library permission (recommended)
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== "granted") {
+      Alert.alert("需要相册权限", "请到系统设置中允许访问照片。");
+      return;
+    }
+
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      // New API: use 'images' instead of deprecated MediaTypeOptions.Images
+      mediaTypes: "images",
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.9,
+      // allowsMultipleSelection defaults to false; keep single image selection
     });
-    if (!res.canceled) setAvatar(res.assets[0].uri);
+
+    if (!res.canceled && Array.isArray(res.assets) && res.assets.length > 0) {
+      const uri = res.assets[0]?.uri;
+      if (uri) setAvatar(uri);
+    }
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -219,7 +233,7 @@ export default function ProfileForm({ mode }: { mode: Mode }) {
         </View>
 
         {/* Capability Section */}
-        <View style={styles.section}>
+        <View className="section" style={styles.section}>
           <Label color={t.label}>想提升的能力</Label>
           <View style={styles.chips}>
             {[
