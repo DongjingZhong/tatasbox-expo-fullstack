@@ -21,11 +21,9 @@ import { useTheme } from "@/providers/ThemeProvider";
 import TopBar from "@/components/ui/TopBar";
 import StartNowBar from "@/components/home/StartNowBar";
 
-function localeToLabel(tag: string | undefined) {
+function localeToLabel(tag?: string) {
   if (!tag) return "English";
   const lower = tag.toLowerCase();
-
-  // map by language prefix
   if (lower.startsWith("zh")) return "中文";
   if (lower.startsWith("en")) return "English";
   if (lower.startsWith("es")) return "Español";
@@ -35,18 +33,16 @@ function localeToLabel(tag: string | undefined) {
   if (lower.startsWith("ko")) return "한국어";
   if (lower.startsWith("pt")) return "Português";
   if (lower.startsWith("it")) return "Italiano";
-
-  // fallback to raw tag
   return tag;
 }
 
 export default function RoleplaySetupSimple() {
   const { colors, isDark } = useTheme();
 
-  // Detect device language once
+  // Device language → default value for "language"
   const deviceLangTag =
     (Localization.getLocales && Localization.getLocales()[0]?.languageTag) ||
-    (Localization as any).locale || // fallback for older SDKs
+    (Localization as any).locale ||
     "en";
   const defaultLang = useMemo(
     () => localeToLabel(deviceLangTag),
@@ -57,11 +53,77 @@ export default function RoleplaySetupSimple() {
   const [aiRole, setAiRole] = useState("");
   const [meRole, setMeRole] = useState("");
   const [situation, setSituation] = useState("");
-  const [language, setLanguage] = useState(defaultLang); // prefill with device language
+  const [language, setLanguage] = useState(defaultLang); // prefilled
   const [detail, setDetail] = useState(""); // optional
+
+  // —— Advanced persona (paid) ——
+  // TODO: replace with real subscription flag
+  const isPremium = false;
+  const [advOpen, setAdvOpen] = useState(false);
+
+  const AI_TRAIT_OPTIONS = useMemo(
+    () => [
+      "刁钻挑剔",
+      "泼辣犀利",
+      "直来直去",
+      "高要求",
+      "严肃冷静",
+      "逻辑至上",
+      "苏格拉底式提问",
+      "鼓励型",
+      "幽默挖苦",
+    ],
+    []
+  );
+  const ME_TRAIT_OPTIONS = useMemo(
+    () => [
+      "幽默搞笑",
+      "沉稳克制",
+      "自信果断",
+      "共情友善",
+      "专业严谨",
+      "机智反问",
+      "简洁直给",
+      "故事化表达",
+    ],
+    []
+  );
+
+  const [aiTraits, setAiTraits] = useState<string[]>([]);
+  const [myTraits, setMyTraits] = useState<string[]>([]);
+  const [customAiTraits, setCustomAiTraits] = useState("");
+  const [customMyTraits, setCustomMyTraits] = useState("");
 
   const placeholder = isDark ? "#94A3B8" : "#64748B";
   const subtle = placeholder;
+
+  const requirePremium = () => {
+    Alert.alert(
+      "高级定制未解锁",
+      "设置“性格风格 / 回复风格”属于高级定制功能。开通后即可保存你的专属风格。",
+      [
+        { text: "以后再说", style: "cancel" },
+        { text: "去开通", onPress: () => router.push("/pricing") },
+      ]
+    );
+  };
+
+  const toggleTrait = (
+    list: string[],
+    setList: (v: string[]) => void,
+    item: string
+  ) => {
+    if (!isPremium) return requirePremium();
+    setList(
+      list.includes(item) ? list.filter((x) => x !== item) : [...list, item]
+    );
+  };
+
+  const splitCustom = (s: string) =>
+    s
+      .split(/[,\s，、]+/g)
+      .map((x) => x.trim())
+      .filter(Boolean);
 
   const onConfirm = () => {
     const a = aiRole.trim();
@@ -73,6 +135,13 @@ export default function RoleplaySetupSimple() {
       return;
     }
 
+    const finalAiTraits = isPremium
+      ? [...aiTraits, ...splitCustom(customAiTraits)].join("|")
+      : "";
+    const finalMyTraits = isPremium
+      ? [...myTraits, ...splitCustom(customMyTraits)].join("|")
+      : "";
+
     router.push({
       pathname: "/channels/communication/roleplay/session",
       params: {
@@ -81,6 +150,8 @@ export default function RoleplaySetupSimple() {
         situation: s,
         language: language.trim(),
         detail: detail.trim(),
+        aiTraits: finalAiTraits,
+        myTraits: finalMyTraits,
       },
     });
   };
@@ -111,7 +182,7 @@ export default function RoleplaySetupSimple() {
           {/* —— Base form —— */}
           <View style={styles.formContainer}>
             {/* 场景 */}
-            <View style={styles.block}>
+            <View className="block" style={styles.block}>
               <View style={styles.labelContainer}>
                 <Text style={[styles.label, { color: colors.text }]}>场景</Text>
                 <Text style={[styles.required, { color: "#EF4444" }]}>*</Text>
@@ -189,7 +260,7 @@ export default function RoleplaySetupSimple() {
               />
             </View>
 
-            {/* 使用语言（可选，默认本机语言） */}
+            {/* 使用语言（默认本机语言，可改） */}
             <View style={styles.block}>
               <View style={styles.labelContainer}>
                 <Text style={[styles.label, { color: colors.text }]}>
@@ -232,7 +303,6 @@ export default function RoleplaySetupSimple() {
                   可选
                 </Text>
               </View>
-
               <ClearableTextarea
                 value={detail}
                 onChangeText={setDetail}
@@ -250,14 +320,214 @@ export default function RoleplaySetupSimple() {
                 ]}
                 onClear={() => setDetail("")}
               />
-
               <Text style={[styles.hint, { color: placeholder }]}>
                 建议粘贴关键信息（职位要求、公司背景、场景要点、常见问题等），越具体越好。
               </Text>
             </View>
           </View>
 
-          {/* —— CTA —— */}
+          {/* —— Advanced persona (paid, collapsible) —— */}
+          <View
+            style={[
+              styles.paidSection,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            {/* header row */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setAdvOpen((v) => !v)}
+              style={({ pressed }) => [
+                styles.paidHeader,
+                { opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <View style={styles.paidTitleRow}>
+                <Text style={[styles.paidTitle, { color: colors.text }]}>
+                  高级定制（付费）
+                </Text>
+                <View style={styles.proBadge}>
+                  <Text style={styles.proBadgeText}>PRO</Text>
+                </View>
+              </View>
+
+              <View style={styles.paidActionsRow}>
+                {!isPremium && (
+                  <Pressable
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      requirePremium();
+                    }}
+                    style={({ pressed }) => [
+                      styles.upgradeBtn,
+                      {
+                        borderColor: colors.primary,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={14}
+                      color={colors.primary}
+                    />
+                    <Text
+                      style={[styles.upgradeText, { color: colors.primary }]}
+                    >
+                      开通
+                    </Text>
+                  </Pressable>
+                )}
+                <Ionicons
+                  name={advOpen ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={isDark ? "#E5E7EB" : "#6B7280"}
+                />
+              </View>
+            </Pressable>
+
+            {/* body */}
+            {advOpen && (
+              <View style={styles.collapseBody}>
+                {/* AI traits */}
+                <View style={styles.block}>
+                  <Text style={[styles.subLabel, { color: colors.text }]}>
+                    AI 的性格风格
+                  </Text>
+                  <View style={styles.chipWrap}>
+                    {AI_TRAIT_OPTIONS.map((t) => {
+                      const active = aiTraits.includes(t);
+                      return (
+                        <Pressable
+                          key={t}
+                          onPress={() => toggleTrait(aiTraits, setAiTraits, t)}
+                          disabled={!isPremium}
+                          style={({ pressed }) => [
+                            styles.chip,
+                            {
+                              borderColor: active
+                                ? colors.primary
+                                : colors.border,
+                              backgroundColor: active
+                                ? isDark
+                                  ? "#0B1220"
+                                  : "#F1F5FF"
+                                : "transparent",
+                              opacity: !isPremium ? 0.6 : pressed ? 0.85 : 1,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              { color: active ? colors.primary : colors.text },
+                            ]}
+                          >
+                            {t}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <ClearableInput
+                    value={customAiTraits}
+                    onChangeText={(v) => {
+                      if (!isPremium) return requirePremium();
+                      setCustomAiTraits(v);
+                    }}
+                    placeholder="自定义（用逗号分隔）：如 刁钻，泼辣，讲话犀利"
+                    placeholderTextColor={placeholder}
+                    iconColor={subtle}
+                    containerStyle={styles.inputWrap}
+                    inputStyle={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: isPremium ? colors.primary : colors.border,
+                        color: colors.text,
+                        opacity: isPremium ? 1 : 0.6,
+                      },
+                    ]}
+                    editable={isPremium}
+                    onClear={() => setCustomAiTraits("")}
+                  />
+                </View>
+
+                {/* My traits */}
+                <View style={styles.block}>
+                  <Text style={[styles.subLabel, { color: colors.text }]}>
+                    我的回复风格
+                  </Text>
+                  <View style={styles.chipWrap}>
+                    {ME_TRAIT_OPTIONS.map((t) => {
+                      const active = myTraits.includes(t);
+                      return (
+                        <Pressable
+                          key={t}
+                          onPress={() => toggleTrait(myTraits, setMyTraits, t)}
+                          disabled={!isPremium}
+                          style={({ pressed }) => [
+                            styles.chip,
+                            {
+                              borderColor: active
+                                ? colors.primary
+                                : colors.border,
+                              backgroundColor: active
+                                ? isDark
+                                  ? "#0B1220"
+                                  : "#F1F5FF"
+                                : "transparent",
+                              opacity: !isPremium ? 0.6 : pressed ? 0.85 : 1,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              { color: active ? colors.primary : colors.text },
+                            ]}
+                          >
+                            {t}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <ClearableInput
+                    value={customMyTraits}
+                    onChangeText={(v) => {
+                      if (!isPremium) return requirePremium();
+                      setCustomMyTraits(v);
+                    }}
+                    placeholder="自定义（用逗号分隔）：如 搞笑幽默，简洁直接"
+                    placeholderTextColor={placeholder}
+                    iconColor={subtle}
+                    containerStyle={styles.inputWrap}
+                    inputStyle={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: isPremium ? colors.primary : colors.border,
+                        color: colors.text,
+                        opacity: isPremium ? 1 : 0.6,
+                      },
+                    ]}
+                    editable={isPremium}
+                    onClear={() => setCustomMyTraits("")}
+                  />
+
+                  <Text style={[styles.hint, { color: placeholder }]}>
+                    小提示：开通后你选择的风格会传入会话，让 AI
+                    以该风格提问/回应；“我的回复风格”也会用于生成建议或改写提示。
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* CTA */}
           <StartNowBar variant="inline" onPress={onConfirm} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -265,7 +535,7 @@ export default function RoleplaySetupSimple() {
   );
 }
 
-/** A reusable single-line input with a small clear (×) button. */
+/** Reusable single-line input with a small clear (×) button. */
 function ClearableInput({
   value,
   onChangeText,
@@ -286,7 +556,7 @@ function ClearableInput({
         {...rest}
         value={value}
         onChangeText={onChangeText}
-        style={[inputStyle, { paddingRight: 36 }]} // leave space for the icon
+        style={[inputStyle, { paddingRight: 36 }]}
       />
       {!!value && (
         <Pressable
@@ -302,7 +572,7 @@ function ClearableInput({
   );
 }
 
-/** A reusable multiline textarea with a small clear (×) button. */
+/** Reusable multiline textarea with a small clear (×) button. */
 function ClearableTextarea({
   value,
   onChangeText,
@@ -325,7 +595,7 @@ function ClearableTextarea({
         textAlignVertical="top"
         value={value}
         onChangeText={onChangeText}
-        style={[textareaStyle, { paddingRight: 36 }]} // leave space for the icon
+        style={[textareaStyle, { paddingRight: 36 }]}
       />
       {!!value && (
         <Pressable
@@ -387,8 +657,64 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
+  // Paid section styles
+  paidSection: { marginTop: 16, padding: 12, borderRadius: 16, borderWidth: 1 },
+  paidHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 44,
+    paddingHorizontal: 4,
+  },
+  paidTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  paidActionsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  paidTitle: { fontSize: 16, fontWeight: "700" },
+  proBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: "#111827",
+    borderRadius: 999,
+  },
+  proBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  upgradeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+  },
+  upgradeText: { fontSize: 12, fontWeight: "700" },
+
+  // Chips
+  subLabel: { fontSize: 14, fontWeight: "700" },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  chip: {
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipText: { fontSize: 13, fontWeight: "600" },
+
   hint: { fontSize: 12, lineHeight: 16, marginTop: 6 },
 
+  // Collapse
+  collapseBody: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(148,163,184,0.25)",
+    gap: 16,
+  },
+
+  // Clear buttons
   clearBtn: {
     position: "absolute",
     right: 10,
@@ -396,9 +722,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
   },
-  clearBtnMultiline: {
-    position: "absolute",
-    right: 10,
-    top: 10,
-  },
+  clearBtnMultiline: { position: "absolute", right: 10, top: 10 },
 });
